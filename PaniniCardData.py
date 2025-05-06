@@ -16,6 +16,7 @@ driver.get(url)
 WebDriverWait(driver, 20).until(
 EC.presence_of_element_located((By.ID, "games_table"))
 )
+last_height = 0
 while True:
     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
     time.sleep(2)  # Wait for new data to load
