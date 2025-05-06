@@ -53,5 +53,11 @@ while True:
 
 
 driver.quit()
+#remove the -- rows and then removes the first row of not the real column names
 final_df = pd.concat(all_data, ignore_index=True)
+final_df = final_df[~final_df.apply(lambda row: row.astype(str).str.contains('--')).any(axis=1)]
 final_df.to_csv("espn_fantasy_all_projections.csv", index=False)
+
+ds = pd.read_csv("espn_fantasy_all_projections.csv", skiprows=1)
+ds.to_csv("espn_fantasy_all_projections.csv", index=False)
+
