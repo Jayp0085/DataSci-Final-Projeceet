@@ -12,15 +12,10 @@ options.headless = True
 driver = webdriver.Chrome(options=options)
 url = "https://www.sportscardspro.com/console/basketball-cards-2024-panini-nba-hoops"
 driver.get(url)
-try:
-    WebDriverWait(driver, 20).until(
-        EC.presence_of_element_located((By.ID, "games_table"))
-    )
-except:
-    print("Table did not load in time.")
-    driver.quit()
-    exit()
-last_height = driver.execute_script("return document.body.scrollHeight")
+
+WebDriverWait(driver, 20).until(
+EC.presence_of_element_located((By.ID, "games_table"))
+)
 while True:
     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
     time.sleep(2)  # Wait for new data to load
@@ -39,7 +34,7 @@ for tr in table.find('tbody').find_all('tr'):
 df = pd.DataFrame(rows, columns=headers)
 df.to_csv('2024_panini_nba_hoops_prices.csv', index=False)
 driver.quit()
-
+#remove last column which is the add to cart button. Everything else is what we want now to get nba predictions 
 df = pd.read_csv('2024_panini_nba_hoops_prices.csv')
 df.drop(columns=['Unnamed: 4'], inplace=True)
 df.to_csv('2024_panini_nba_hoops_prices.csv', index=False)
