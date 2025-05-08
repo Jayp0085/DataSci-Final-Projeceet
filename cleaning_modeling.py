@@ -276,3 +276,39 @@ print("\nSample Predictions:")
 print(predictions_df[['Card', f'Actual_{TARGET_PRICE}', f'Predicted_{TARGET_PRICE}'] + stat_cols_to_use].head())
 
 # Below we can try to implement other modeling methods
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import GradientBoostingRegressor
+
+# --- Linear Regression ---
+print("\nTraining Linear Regression Model...")
+lr_model = LinearRegression()
+lr_model.fit(X_train_scaled, y_train)
+
+y_pred_lr_log = lr_model.predict(X_test_scaled)
+y_pred_lr = np.expm1(y_pred_lr_log)
+y_pred_lr[y_pred_lr < 0] = 0  # no negatives 
+
+mae_lr = mean_absolute_error(y_test_actual, y_pred_lr)
+rmse_lr = np.sqrt(mean_squared_error(y_test_actual, y_pred_lr))
+r2_lr = r2_score(y_test_actual, y_pred_lr)
+
+print(f"\nLinear Regression Results:")
+print(f"MAE: ${mae_lr:.2f}")
+print(f"RMSE: ${rmse_lr:.2f}")
+print(f"R²: {r2_lr:.4f}")
+
+# plt.figure(figsize=(8, 6))
+# plt.scatter(y_test_actual, y_pred_lr, alpha=0.6, color='royalblue', edgecolor='k')
+# plt.plot([y_test_actual.min(), y_test_actual.max()],
+#          [y_test_actual.min(), y_test_actual.max()], 'r--', linewidth=2)
+# plt.xlabel("Actual PSA 10 Price ($)")
+# plt.ylabel("Predicted PSA 10 Price ($)")
+# plt.title("Linear Regression: Actual vs. Predicted Prices")
+# plt.grid(True)
+# plt.show()
+# residuals = y_test_actual - y_pred_lr
+
+
+
+
+
