@@ -1,1 +1,1 @@
-# DataSci-Final-Projeceet
+# NBA Trading Card Price Predictor
