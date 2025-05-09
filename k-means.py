@@ -3,6 +3,7 @@ import numpy as np
 import re
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 import matplotlib.pyplot as plt
 
 # --- 1. Load Data ---
@@ -16,63 +17,53 @@ def clean_price(p):
     try: return float(s)
     except: return np.nan
 
-for col in ['Ungraded','Grade 9','PSA 10']:
+for col in ['Ungraded', 'Grade 9', 'PSA 10']:
     prices_df[col] = prices_df[col].apply(clean_price)
 
-def extract_player_name_from_card(desc):
+def extract_player_name(desc):
     if pd.isna(desc): return None
-    name = re.sub(r"\[.*?\]","",desc).strip()
+    name = re.sub(r"\[.*?\]", "", desc).strip()
     name = re.split(r"\s*#\d+|\s*/\d+", name)[0].strip()
-    # drop box lines
-    if name.lower() in ["blaster box","hobby box"]: return None
-    # strip known suffixes
-    for var in ["Premium","Silver","Gold","Red Explosion","Lazer Blue Prizm","Silver Prizm","Gold Vinyl Prizm","Artist Proof","Nebula Prizm","Black Artist Proof"]:
-        if name.endswith(var):
-            name = name[:-len(var)].strip()
+    if name.lower() in ["blaster box", "hobby box"]:
+        return None
+    for suf in ["Premium","Silver","Gold","Red Explosion","Lazer Blue Prizm",
+                "Silver Prizm","Gold Vinyl Prizm","Artist Proof",
+                "Nebula Prizm","Black Artist Proof"]:
+        if name.endswith(suf):
+            name = name[:-len(suf)].strip()
             break
     return name
 
-prices_df['Player_Extracted'] = prices_df['Card'].apply(extract_player_name_from_card)
+prices_df['Player'] = prices_df['Card'].apply(extract_player_name)
 prices_df['Is_RC'] = prices_df['Card'].str.contains(r'\[RC\]', na=False).astype(int)
-
-def extract_print_run(desc):
-    if pd.isna(desc): return np.nan
-    m = re.search(r'/(\d+)', desc)
-    return int(m.group(1)) if m else np.nan
-
-prices_df['Print_Run'] = prices_df['Card'].apply(extract_print_run)
-prices_df['Is_Serial_Numbered'] = prices_df['Print_Run'].notna().astype(int)
+prices_df['Print_Run'] = prices_df['Card'].str.extract(r'/(\d+)', expand=False).astype(float)
+prices_df['Is_Serial'] = prices_df['Print_Run'].notna().astype(int)
 
 def extract_variant(desc):
     if pd.isna(desc): return "Base"
-    s = re.sub(r"\[.*?\]","",desc)
-    s = re.sub(r"^[^#]+#\d+\s*","",s)
-    s = re.sub(r"\s*/\d+","",s).strip()
-    if not s: return "Base"
-    if "Gold Vinyl Prizm Premium" in desc: return "Gold Vinyl Prizm Premium"
     if "Gold Artist Proof" in desc: return "Gold Artist Proof"
+    if "Premium Gold Prizm" in desc: return "Premium Gold Prizm"
+    if "Gold Vinyl Prizm Premium" in desc: return "Gold Vinyl Prizm Premium"
     if "Red Explosion" in desc: return "Red Explosion"
     if "Lazer Blue Prizm Premium" in desc: return "Lazer Blue Prizm Premium"
     if "Nebula Prizm Premium" in desc: return "Nebula Prizm Premium"
-    if "Black Artist Proof" in desc: return "Black Artist Proof"
+    if "Artist Proof" in desc: return "Artist Proof"
     if "Silver Prizm Premium" in desc: return "Silver Prizm Premium"
     if "Silver" in desc and "/199" in desc: return "Silver /199"
-    if "Premium" in desc: return "Premium Base"
-    keywords = ["Gold","Silver","Prizm","Artist Proof","Explosion","Vinyl","Nebula"]
-    found = [kw for kw in keywords if kw.lower() in s.lower()]
-    return " ".join(found) if found else ("Base RC" if "[RC]" in desc else "Base")
+    if "Premium" in desc: return "Premium"
+    return "Base"
 
 prices_df['Variant'] = prices_df['Card'].apply(extract_variant)
-prices_df.dropna(subset=['Player_Extracted'], inplace=True)
+prices_df.dropna(subset=['Player'], inplace=True)
 
 # --- 3. Preprocess Stats Data ---
-def clean_stats_player_name(name):
-    if pd.isna(name): return None
-    s = re.sub(r"([A-Z]{2,5}|O|DTD|FA)+([A-Z]{1,2}(?:,\s*[A-Z]{1,2})*)?$","", str(name)).strip()
-    return re.sub(r"([A-Z]{3,})$","", s).strip()
+def clean_stats_name(s):
+    if pd.isna(s): return None
+    name = re.sub(r"([A-Z]{2,5}|O|DTD|FA)+([A-Z]{1,2}(?:,\s*[A-Z]{1,2})*)?$", "", str(s)).strip()
+    return re.sub(r"([A-Z]{3,})$", "", name).strip()
 
-stats_df['Player_Cleaned'] = stats_df['Player'].apply(clean_stats_player_name)
-stats_df.drop_duplicates(subset=['Player_Cleaned'], keep='first', inplace=True)
+stats_df['Player_Clean'] = stats_df['Player'].apply(clean_stats_name)
+stats_df.drop_duplicates(subset=['Player_Clean'], keep='first', inplace=True)
 
 stat_cols = ['MIN','FG%','FT%','3PM','REB','AST','STL','BLK','PTS']
 for c in stat_cols:
@@ -81,10 +72,10 @@ for c in stat_cols:
 # --- 4. Merge ---
 merged_df = pd.merge(
     prices_df,
-    stats_df[['Player_Cleaned'] + stat_cols],
-    left_on='Player_Extracted', right_on='Player_Cleaned',
+    stats_df[['Player_Clean'] + stat_cols],
+    left_on='Player', right_on='Player_Clean',
     how='left'
-).drop(columns=['Player_Cleaned'])
+).drop(columns=['Player_Clean'])
 
 # --- 5. Feature Engineering ---
 merged_df['Print_Run'].fillna(5000, inplace=True)
@@ -92,10 +83,8 @@ merged_df = pd.get_dummies(merged_df, columns=['Variant'], prefix='Var')
 for c in stat_cols:
     merged_df[c].fillna(0, inplace=True)
 
-# Now define the features for clustering
-feature_cols = stat_cols + ['Is_RC','Print_Run','Is_Serial_Numbered'] \
+feature_cols = stat_cols + ['Is_RC','Print_Run','Is_Serial'] \
                + [c for c in merged_df.columns if c.startswith('Var_')]
-
 X = merged_df[feature_cols]
 
 # --- 6. Standardize & Elbow Method ---
@@ -108,29 +97,45 @@ for k in range(1, 11):
     km.fit(X_scaled)
     wcss.append(km.inertia_)
 
-plt.figure(figsize=(8,4))
-plt.plot(range(1,11), wcss, 'o-')
-plt.xlabel('k')
-plt.ylabel('WCSS')
-plt.title('Elbow Method')
+plt.figure(figsize=(8, 4))
+plt.plot(range(1, 11), wcss, 'o-', linewidth=2)
+plt.xlabel('Number of clusters k')
+plt.ylabel('Within-cluster sum of squares (WCSS)')
+plt.title('Elbow Method for Optimal k')
 plt.show()
 
-# --- 7. Fit & Inspect K-Means ---
-k = 4  # choose based on your elbow plot
+# --- 7. Fit K-Means with k = 3 ---
+k = 3
 kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
 merged_df['Cluster'] = kmeans.fit_predict(X_scaled)
 
+# --- 8. Inspect Cluster Centers ---
 centers = scaler.inverse_transform(kmeans.cluster_centers_)
 centers_df = pd.DataFrame(centers, columns=feature_cols)
-print("Cluster centers (original units):")
-print(centers_df)
 
-# Optional: quick scatter of two stats
-plt.figure(figsize=(8,6))
-ix_pts = feature_cols.index('PTS')
-ix_reb = feature_cols.index('REB')
-plt.scatter(X_scaled[:,ix_pts], X_scaled[:,ix_reb],
-            c=merged_df['Cluster'], cmap='tab10', alpha=0.6)
-plt.xlabel('PTS (scaled)')
-plt.ylabel('REB (scaled)')
-plt.show()
+# --- 9. Cluster Summary ---
+cluster_summary = (
+    merged_df
+    .groupby('Cluster')
+    .agg(
+        count=('Cluster', 'size'),
+        avg_price=('PSA 10', 'mean'),
+        avg_pts=('PTS', 'mean'),
+        avg_reb=('REB', 'mean'),
+        avg_printrun=('Print_Run', 'mean'),
+        pct_rookie=('Is_RC', 'mean')
+    )
+    .reset_index()
+)
+
+# --- 10. Validate Clustering ---
+sil = silhouette_score(X_scaled, merged_df['Cluster'])
+
+# --- 11. Prettify for Report (Markdown tables) ---
+print("\n## Cluster Centers\n")
+print(centers_df.to_markdown(index=False))
+
+print("\n## Cluster Summary\n")
+print(cluster_summary.to_markdown(index=False))
+
+print(f"\nSilhouette score for k={k}: {sil:.3f}")
