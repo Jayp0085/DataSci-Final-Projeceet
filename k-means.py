@@ -6,11 +6,11 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 import matplotlib.pyplot as plt
 
-# --- 1. Load Data ---
+# Load Data
 prices_df = pd.read_csv("2024_panini_nba_hoops_prices.csv")
 stats_df  = pd.read_csv("espn_fantasy_all_projections.csv")
 
-# --- 2. Preprocess Price Data ---
+# Preprocess Price Data
 def clean_price(p):
     if pd.isna(p) or p == '': return np.nan
     s = str(p).replace('$','').replace(',','')
@@ -56,7 +56,7 @@ def extract_variant(desc):
 prices_df['Variant'] = prices_df['Card'].apply(extract_variant)
 prices_df.dropna(subset=['Player'], inplace=True)
 
-# --- 3. Preprocess Stats Data ---
+# Preprocess Stats Data
 def clean_stats_name(s):
     if pd.isna(s): return None
     name = re.sub(r"([A-Z]{2,5}|O|DTD|FA)+([A-Z]{1,2}(?:,\s*[A-Z]{1,2})*)?$", "", str(s)).strip()
@@ -69,7 +69,7 @@ stat_cols = ['MIN','FG%','FT%','3PM','REB','AST','STL','BLK','PTS']
 for c in stat_cols:
     stats_df[c] = pd.to_numeric(stats_df[c], errors='coerce')
 
-# --- 4. Merge ---
+# Merge
 merged_df = pd.merge(
     prices_df,
     stats_df[['Player_Clean'] + stat_cols],
@@ -77,7 +77,7 @@ merged_df = pd.merge(
     how='left'
 ).drop(columns=['Player_Clean'])
 
-# --- 5. Feature Engineering ---
+# Feature Engineering
 merged_df['Print_Run'].fillna(5000, inplace=True)
 merged_df = pd.get_dummies(merged_df, columns=['Variant'], prefix='Var')
 for c in stat_cols:
@@ -87,7 +87,7 @@ feature_cols = stat_cols + ['Is_RC','Print_Run','Is_Serial'] \
                + [c for c in merged_df.columns if c.startswith('Var_')]
 X = merged_df[feature_cols]
 
-# --- 6. Standardize & Elbow Method ---
+# Standardize & Elbow Method
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
@@ -104,16 +104,16 @@ plt.ylabel('Within-cluster sum of squares (WCSS)')
 plt.title('Elbow Method for Optimal k')
 plt.show()
 
-# --- 7. Fit K-Means with k = 3 ---
+# Fit K-Means with k = 3
 k = 3
 kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
 merged_df['Cluster'] = kmeans.fit_predict(X_scaled)
 
-# --- 8. Inspect Cluster Centers ---
+# Inspect Cluster Centers
 centers = scaler.inverse_transform(kmeans.cluster_centers_)
 centers_df = pd.DataFrame(centers, columns=feature_cols)
 
-# --- 9. Cluster Summary ---
+# Cluster Summary
 cluster_summary = (
     merged_df
     .groupby('Cluster')
@@ -128,10 +128,10 @@ cluster_summary = (
     .reset_index()
 )
 
-# --- 10. Validate Clustering ---
+# Validate Clustering
 sil = silhouette_score(X_scaled, merged_df['Cluster'])
 
-# --- 11. Prettify for Report (Markdown tables) ---
+# Readable for Report (Markdown tables)
 print("\n## Cluster Centers\n")
 print(centers_df.to_markdown(index=False))
 
