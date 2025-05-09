@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# --- 1. Load Data ---
+# Load Data
 try:
     prices_df = pd.read_csv("2024_panini_nba_hoops_prices.csv")
     stats_df = pd.read_csv("espn_fantasy_all_projections.csv")
@@ -16,7 +16,7 @@ except FileNotFoundError:
     print("Make sure the CSV files are in the same directory as the script.")
     exit()
 
-# --- 2. Preprocess Price Data ---
+# Preprocess Price Data
 print("Preprocessing Price Data...")
 
 # Make a copy to avoid erronious manipulation
@@ -122,7 +122,7 @@ print(f"Price data shape after initial processing: {prices_df.shape}")
 # print("\nSample of processed price data:")
 # print(prices_df[['Card', 'Player_Extracted', 'Is_RC', 'Print_Run', 'Variant', 'Ungraded', 'PSA 10']].head())
 
-# --- 3. Preprocess Stats Data ---
+# Preprocess Stats Data
 print("\nPreprocessing Stats Data...")
 stats_df = stats_df.copy()
 
@@ -152,7 +152,7 @@ print(f"Stats data shape after processing: {stats_df.shape}")
 # print("\nSample of processed stats data:")
 # print(stats_df[['Player', 'Player_Cleaned'] + stat_cols_to_use].head())
 
-# --- 4. Merge Data ---
+# Merge Data
 print("\nMerging Data...")
 # Merge on the cleaned/extracted player names
 merged_df = pd.merge(prices_df, stats_df[['Player_Cleaned'] + stat_cols_to_use],
@@ -160,19 +160,19 @@ merged_df = pd.merge(prices_df, stats_df[['Player_Cleaned'] + stat_cols_to_use],
 
 # Drop the redundant player name column from stats_df
 merged_df.drop(columns=['Player_Cleaned'], inplace=True)
-
 print(f"Merged data shape: {merged_df.shape}")
 # print("\nSample of merged data (showing some NaNs for non-matches):")
 # print(merged_df[merged_df['Player_Extracted'] == 'Victor Wembanyama'][['Card', 'Player_Extracted', 'PTS', 'Ungraded']].head())
 # print(merged_df[merged_df['Player_Extracted'] == 'Bronny James Jr.'][['Card', 'Player_Extracted', 'PTS', 'Ungraded']].head()) # Likely NaN for PTS
 
-# --- 5. Feature Engineering (Post-Merge) ---
+# Feature Engineering
 print("\nFeature Engineering...")
 
 # Target variable: Predicting 'PSA 10' price
 # drop rows where this target is missing
-TARGET_PRICE = 'PSA 10' 
+TARGET_PRICE = 'Ungraded' 
 # TARGET_PRICE = 'Ungraded' # Target column easily interchangeable for Ungraded/PSA 9
+# TARGET_PRICE = 'Grade 9'
 
 # Fill NaNs in Print_Run with a high value if Is_Serial_Numbered is False
 # Placeholder if it's True but missing (tries to cover for where extraction messes up)
@@ -204,10 +204,10 @@ if merged_df.empty:
 X = merged_df[features]
 y = merged_df[TARGET_PRICE]
 
-# Log transform target variable if it's highly skewed (common for prices)
+# Log transform target variable since it's highly skewed (common for prices)
 y_log = np.log1p(y) # log1p handles zeros
 
-# --- 6. Model Selection & Training ---
+# Model Selection & Training
 print("\nModel Training...")
 X_train, X_test, y_train, y_test = train_test_split(X, y_log, test_size=0.4, random_state=42)
 
@@ -220,11 +220,11 @@ X_train_scaled = X_train
 X_test_scaled = X_test
 
 
-# Using RandomForestRegressor (If anyone can try to implement linear regression or other modeling methods we should do that)
+# Using RandomForestRegressor
 model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1, max_depth=10, min_samples_leaf=2)
 model.fit(X_train_scaled, y_train)
 
-# --- 7. Evaluation ---
+# Evaluation
 print("\nModel Evaluation...")
 y_pred_log = model.predict(X_test_scaled)
 
@@ -252,7 +252,7 @@ feature_importance_df = feature_importance_df.sort_values('importance', ascendin
 print("\nTop Feature Importances:")
 print(feature_importance_df.head(15))
 
-# --- 8. Visualization of Predictions vs Actual ---
+# Visualization of Predictions vs Actual
 plt.figure(figsize=(10, 6))
 plt.scatter(y_test_actual, y_pred, alpha=0.5)
 plt.plot([y_test_actual.min(), y_test_actual.max()], [y_test_actual.min(), y_test_actual.max()], 'k--', lw=2) # Diagonal line
@@ -264,7 +264,7 @@ plt.yscale('log')
 plt.grid(True)
 plt.show()
 
-# --- Example: Show some predictions ---
+# Example: Show some predictions
 predictions_df = X_test.copy()
 predictions_df[f'Actual_{TARGET_PRICE}'] = y_test_actual
 predictions_df[f'Predicted_{TARGET_PRICE}'] = y_pred
@@ -279,7 +279,7 @@ print(predictions_df[['Card', f'Actual_{TARGET_PRICE}', f'Predicted_{TARGET_PRIC
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import GradientBoostingRegressor
 
-# --- Linear Regression ---
+# Linear Regression
 print("\nTraining Linear Regression Model...")
 lr_model = LinearRegression()
 lr_model.fit(X_train_scaled, y_train)
@@ -297,6 +297,7 @@ print(f"MAE: ${mae_lr:.2f}")
 print(f"RMSE: ${rmse_lr:.2f}")
 print(f"R²: {r2_lr:.4f}")
 
+# Visualize Accuracy of Linear Regression
 # plt.figure(figsize=(8, 6))
 # plt.scatter(y_test_actual, y_pred_lr, alpha=0.6, color='royalblue', edgecolor='k')
 # plt.plot([y_test_actual.min(), y_test_actual.max()],
@@ -307,7 +308,3 @@ print(f"R²: {r2_lr:.4f}")
 # plt.grid(True)
 # plt.show()
 # residuals = y_test_actual - y_pred_lr
-
-
-
-
