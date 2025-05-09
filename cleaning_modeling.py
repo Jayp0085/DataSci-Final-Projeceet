@@ -209,7 +209,7 @@ y_log = np.log1p(y) # log1p handles zeros
 
 # --- 6. Model Selection & Training ---
 print("\nModel Training...")
-X_train, X_test, y_train, y_test = train_test_split(X, y_log, test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y_log, test_size=0.4, random_state=42)
 
 # Commented out data scaling, can uncomment to see how scaled data will perform
 # scaler = StandardScaler()
@@ -249,7 +249,7 @@ importances = model.feature_importances_
 feature_importance_df = pd.DataFrame({'feature': X.columns, 'importance': importances})
 feature_importance_df = feature_importance_df.sort_values('importance', ascending=False).reset_index(drop=True)
 
-print("\nTop 15 Feature Importances:")
+print("\nTop Feature Importances:")
 print(feature_importance_df.head(15))
 
 # --- 8. Visualization of Predictions vs Actual ---
@@ -273,7 +273,7 @@ predictions_df = predictions_df.merge(merged_df[['Card'] + stat_cols_to_use],
                                       left_index=True, right_index=True, suffixes=('', '_orig_stats'))
 
 print("\nSample Predictions:")
-print(predictions_df[['Card', f'Actual_{TARGET_PRICE}', f'Predicted_{TARGET_PRICE}'] + stat_cols_to_use].head())
+print(predictions_df[['Card', f'Actual_{TARGET_PRICE}', f'Predicted_{TARGET_PRICE}'] + stat_cols_to_use])
 
 # Below we can try to implement other modeling methods
 from sklearn.linear_model import LinearRegression
@@ -307,7 +307,6 @@ print(f"R²: {r2_lr:.4f}")
 # plt.grid(True)
 # plt.show()
 # residuals = y_test_actual - y_pred_lr
-
 
 
 
